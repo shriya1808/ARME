@@ -169,7 +169,7 @@ class ARMAE:
         print("df last value is ",type(df.iloc[-1]["consequent"]))
 
         print("shape of df before readmission",df.shape)
-        df = df[df['consequent'].apply(lambda x: len(x) == 1 and (x[0] == 611 or x[0] == 612))]
+        df = df[df['consequent'].apply(lambda x: len(x) == 1 and (x[0] == self.dataSize-1))]
 
         # df =  df[(df['consequent'] == [147]) | (df['consequent'] == [148])]
         print("shape of df after readmission",df.shape)

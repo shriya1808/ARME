@@ -2,18 +2,20 @@ import numpy as np
 import pandas as pd
 import torch
 from torch.nn import L1Loss
+from torch.utils.data import DataLoader, random_split
 
 from AutoEncoder import *
 
 import copy
 import time
+import os
 
 import tqdm
 from ast import literal_eval
 
 
 class ARMAE:
-    def __init__(self, dataSize,  learningRate=1e-3, maxEpoch=10,
+    def __init__(self, dataSize,  learningRate=1e-3, maxEpoch=100,
                  batchSize=128,  hiddenSize='dataSize',  likeness=0.4,minSupp=0,minConf=0,columns=[],isLoadedModel=False, IM=['support','confidence'],):
         self.dataSize = dataSize
         self.learningRate = learningRate
@@ -39,38 +41,87 @@ class ARMAE:
         self.results = []
 
 
-    def dataPretraitement(self, d):
+    def dataPretraitement(self, d, val_split=0.2):
         self.columns = d.columns
-        trainTensor = torch.tensor(d.values)
-        dataLoader = DataLoader(trainTensor.float(), batch_size=self.batchSize, shuffle=True)
-        return dataLoader
+        fullTensor = torch.tensor(d.values).float()
+
+        dataset_size = len(fullTensor)
+        val_size = int(val_split * dataset_size)
+        train_size = dataset_size - val_size
+
+        train_dataset, val_dataset = random_split(fullTensor, [train_size, val_size])
+
+        trainLoader = DataLoader(train_dataset, batch_size=self.batchSize, shuffle=True)
+        valLoader = DataLoader(val_dataset, batch_size=self.batchSize, shuffle=False)
+
+        return trainLoader, valLoader
 
     def save(self, p):
         self.model.save(p)
 
     def load(self, encoderPath,decoderPath):
         self.model.load(encoderPath,decoderPath)
-
-    def train(self, dataLoader,modelPath):
+    
+    def train(self, trainLoader, valLoader, modelPath, patience=10, min_delta=1e-3, warmUpEpochs=5):
+        best_val_loss = float("inf")
+        patience_counter = 0
 
         for epoch in range(self.maxEpoch):
-            for data in dataLoader:
-                d = data.to(self.device)
-                output = self.model.forward(d)
-                self.y_ = output[0]
-                self.x = d
-                loss = self.criterion(output[0], d)
-                loss.backward()
 
+            # -------- TRAIN --------
+            self.model.train()
+            train_loss = 0
+
+            for data in trainLoader:
+                d = data.to(self.device)
+
+                output = self.model.forward(d)
+                loss = self.criterion(output[0], d)
+
+                loss.backward()
                 self.optimizer.step()
                 self.optimizer.zero_grad()
-            if not self.isLoadedModel:
-                self.save(modelPath+str(epoch))
 
-            print('epoch [{}/{}], loss:{:.4f}'
-                  .format(epoch + 1, self.maxEpoch, loss.data))
+                train_loss += loss.item()
+
+            train_loss /= len(trainLoader)
+
+            # -------- VALIDATION --------
+            self.model.eval()
+            val_loss = 0
+
+            with torch.no_grad():
+                for data in valLoader:
+                    d = data.to(self.device)
+                    output = self.model(d)
+                    loss = self.criterion(output[0], d)
+                    val_loss += loss.item()
+
+            val_loss /= len(valLoader)
+
+            print(f"Epoch [{epoch+1}/{self.maxEpoch}] "
+                  f"Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
+
+            # -------- EARLY STOPPING --------
+            if val_loss < best_val_loss - min_delta:
+                best_val_loss = val_loss
+                patience_counter = 0
+
+                if not self.isLoadedModel:
+                    self.save(os.path.join(modelPath, "best_model"))
+
+            else:
+                if epoch < warmUpEpochs:
+                    continue  # Skip early stopping during warm-up epochs
+                
+                patience_counter += 1
+
+                if patience_counter >= patience:
+                    print(f"Early stopping triggered at epoch {epoch+1}")
+                    break
 
         return epoch
+
 
 
 

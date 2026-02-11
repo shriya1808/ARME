@@ -10,13 +10,20 @@ import torch
 import os
 import argparse
 
-parser = argparse.ArgumentParser(description="MIMIC-IV Data Pipeline")
+parser = argparse.ArgumentParser(description="AE Rule Mining for Readmission Prediction")
 parser.add_argument(
     "--workdir",
     type=str,
     required=True,
     help="Working directory for the pipeline"
 )
+parser.add_argument(
+    "--datasetName",
+    type=str,
+    required=True,   # set to False if optional
+    help="Path or name of the dataset to be used"
+)
+
 args = parser.parse_args()
 
 root_dir = os.path.dirname(args.workdir)
@@ -27,29 +34,32 @@ nbAntecedents_algo = 3  # Number of antecedents for the algorithm
 minSupp_algo = 0.01  # Minimum support for the algorithm
 minConf = 0.1  # Minimum confidence for the algorithm
 nbRun = 1  # Number of runs
-nbEpoch = 10  # Number of epochs for training
-batchSize = 256  # Batch size for training
+nbEpoch = 100  # Number of epochs for training
+batchSize = 512  # Batch size for training
 learningRate = 10e-3  # Learning rate for training
 likeness = 0.5  # Proportion of similar items in rule with the same consequents
 numberOfRules = 1  # Number of rules per consequent
 minSupp_AE = 0.01  # Minimum support for FP-Growth
-goodQualitySupport = 0.01  # Minimum support for good quality rules
-goodQualityConfidence = 0.6  # Minimum confidence for good quality rules
-goodQualityLift = 1.2  # Minimum lift for good quality rules
+goodQualitySupport = 0.02  # Minimum support for good quality rules
+goodQualityConfidence = 0.1  # Minimum confidence for good quality rules
+goodQualityLift = 1  # Minimum lift for good quality rules
+
+min_delta = 1e-3  # Minimum change in validation loss for early stopping
+warmUpEpochs = 5  # Number of warm-up epochs before early stopping can be triggered
+patience = 5  # Number of epochs to wait for improvement before stopping
 
 # Define file paths and dataset details
-datasetName = 'patient_features_CAD_train'  # Name of the dataset to be used
-run = "CAD"  # Name of the run for organizing results
+datasetName = args.datasetName # Name of the dataset to be used
 
-ARMAEResultsPath = os.path.join(root_dir, 'Results', run, 'NN') 
-exhaustiveResultsPath = os.path.join(root_dir, 'Results', run, 'Exhaustive')
-overallResultsPath = os.path.join(root_dir, 'Results', run, 'Final')
-dataPath = os.path.join(root_dir, 'data', 'clusters', datasetName + '.csv')
+ARMAEResultsPath = os.path.join(root_dir, 'Results', 'NN') 
+exhaustiveResultsPath = os.path.join(root_dir, 'Results', 'Exhaustive')
+overallResultsPath = os.path.join(root_dir, 'Results', 'Final')
+dataPath = os.path.join(root_dir, 'data', datasetName + '.csv')
 
 isLoadedModel = False  # Flag to check if model is loaded
 
 # Paths to save the models
-modelPath = os.path.join(root_dir, 'models', run)
+modelPath = os.path.join(root_dir, 'models')
 encoderPath = os.path.join(modelPath, str(nbEpoch-1), 'encoder.pt')  # Pretrained encoder path
 decoderPath = os.path.join(modelPath, str(nbEpoch-1), 'decoder.pt')  # Pretrained decoder path
 
@@ -61,7 +71,7 @@ for path in [ARMAEResultsPath, exhaustiveResultsPath, overallResultsPath, modelP
 
 # Load the dataset
 data = pd.read_csv(dataPath)
-data.drop(columns=['label_0', 'hadm_id'], inplace=True)  # Drop the 'label_0' and 'hadm_id' column from the dataset
+data.drop(columns=['hadm_id'], inplace=True)  # Drop the 'hadm_id' column from the dataset
 times = []
 
 dataSize = len(data.loc[0])  # Get the size of the data
@@ -271,10 +281,10 @@ else:
 print("......Auto-Encoder Rule Mining Starts here.............")
 for i in range(nbRun):
     NN = ARMAE(dataSize, maxEpoch=nbEpoch, batchSize=batchSize, learningRate=learningRate, likeness=likeness, minSupp=minSupp_AE, minConf=minConf)
-    dataLoader = NN.dataPretraitement(data)  # Preprocess the data for training
+    dataLoader, valLoader = NN.dataPretraitement(data)  # Preprocess the data for training
     t1 = time.time()  # Start timing the training
     if not isLoadedModel:
-        NN.train(dataLoader, modelPath)  # Train the model
+        NN.train(dataLoader, valLoader, modelPath, patience=patience, min_delta=min_delta, warmUpEpochs=warmUpEpochs)  # Train the model
     else:
         NN.load(encoderPath, decoderPath)  # Load the pretrained model
     t2 = time.time()  # End timing the training

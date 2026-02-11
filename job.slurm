@@ -48,5 +48,5 @@ else
     conda activate $ENV_NAME
 fi
 
-python3 readmission_main.py --workdir "$WORK/ARME/"
+python3 readmission_main.py --workdir "$WORK/ARME/" --datasetName "patient_features_CAD_train"
 

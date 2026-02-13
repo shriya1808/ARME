@@ -31,15 +31,15 @@ print(os.getcwd())
 
 # Setting parameters for the algorithm and training
 nbAntecedents_algo = 3  # Number of antecedents for the algorithm
-minSupp_algo = 0.01  # Minimum support for the algorithm
-minConf = 0.1  # Minimum confidence for the algorithm
+minSupp_algo = 0  # Minimum support for the algorithm
+minConf = 0  # Minimum confidence for the algorithm
 nbRun = 1  # Number of runs
 nbEpoch = 100  # Number of epochs for training
 batchSize = 512  # Batch size for training
 learningRate = 10e-3  # Learning rate for training
 likeness = 0.5  # Proportion of similar items in rule with the same consequents
 numberOfRules = 1  # Number of rules per consequent
-minSupp_AE = 0.01  # Minimum support for FP-Growth
+minSupp_AE = 0  # Minimum support for FP-Growth
 goodQualitySupport = 0.02  # Minimum support for good quality rules
 goodQualityConfidence = 0.1  # Minimum confidence for good quality rules
 goodQualityLift = 1  # Minimum lift for good quality rules
@@ -60,8 +60,8 @@ isLoadedModel = False  # Flag to check if model is loaded
 
 # Paths to save the models
 modelPath = os.path.join(root_dir, 'models')
-encoderPath = os.path.join(modelPath, str(nbEpoch-1), 'encoder.pt')  # Pretrained encoder path
-decoderPath = os.path.join(modelPath, str(nbEpoch-1), 'decoder.pt')  # Pretrained decoder path
+encoderPath = os.path.join(modelPath, 'best_modelencoder.pt')  # Pretrained encoder path
+decoderPath = os.path.join(modelPath, 'best_modeldecoder.pt')  # Pretrained decoder path
 
 # Create all necessary directories automatically
 for path in [ARMAEResultsPath, exhaustiveResultsPath, overallResultsPath, modelPath]:

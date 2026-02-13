@@ -10,7 +10,7 @@
 
 unset SLURM_EXPORT_ENV
 
-WORKDIR="$WORK/ARME"
+WORKDIR="$WORK/ARME1"
 cd "$WORKDIR" || exit 1
 echo "Running in: $(pwd)"
 
@@ -48,5 +48,5 @@ else
     conda activate $ENV_NAME
 fi
 
-python3 readmission_main.py --workdir "$WORK/ARME/" --datasetName "patient_features_CAD_train"
+python3 readmission_main.py --workdir "$WORK/ARME1/" --datasetName "patient_features_CAD_train"
 
